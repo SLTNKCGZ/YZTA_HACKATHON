@@ -48,6 +48,7 @@ class Topic(BaseModel):
 class Question(BaseModel):
     id: Optional[PyObjectId] = Field(default_factory=PyObjectId, alias="_id")
     text: str
+    result:str
     topic_id: PyObjectId
 
     class Config:
