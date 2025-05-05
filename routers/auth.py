@@ -3,19 +3,20 @@ from pydantic import BaseModel
 from typing import Annotated
 from starlette import status
 from fastapi.security import OAuth2PasswordRequestForm, OAuth2PasswordBearer
-from ..models import User
+from models import User
 from passlib.context import CryptContext
 from jose import jwt, JWTError
 from datetime import timedelta, datetime, timezone
-from fastapi.templating import Jinja2Templates
+#from fastapi.templating import Jinja2Templates
 from database import db
+
 
 router = APIRouter(
     prefix="/auth",
     tags=["Authentication"],
 )
 
-templates = Jinja2Templates(directory="app/templates/")
+#templates = Jinja2Templates(directory="app/templates/")
 
 SECRET_KEY = "acoztm3revp1vfj7ld5sz2ndg5xp79r9fnr2p4hx2dy63h6a8efhj6rm54u8evh8"
 ALGORITHM = "HS256"
@@ -24,7 +25,7 @@ bcrypt_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_bearer = OAuth2PasswordBearer(tokenUrl="/auth/token")
 
 
-class CreateUserRequest(BaseModel):
+class CreateUserRequest(BaseModel):   #User'dan verilen update ve insert için kullanılan object
     username: str
     email: str
     first_name: str
@@ -37,7 +38,7 @@ class Token(BaseModel):
     token_type: str
 
 
-def create_access_token(username: str, user_id: int, expires_delta: timedelta):
+def create_access_token(username: str, user_id: str, expires_delta: timedelta):
     payload = {'sub': username, 'id': user_id}
     expires = datetime.now(timezone.utc) + expires_delta
     payload.update({'exp': expires})
@@ -47,9 +48,9 @@ def create_access_token(username: str, user_id: int, expires_delta: timedelta):
 async def authenticate_user(username: str, password: str):
     user = await db["users"].find_one({"username": username})
     if not user:
-        return False
+        return None
     if not bcrypt_context.verify(password, user["hashed_password"]):
-        return False
+        return None
     return user
 
 
@@ -66,16 +67,16 @@ async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
 
 
 @router.get("/login-page")
-def render_login_page(request: Request):
+def login_page(request: Request):
     pass
 
 
 @router.get("/register-page")
-def render_register_page(request: Request):
+def register_page(request: Request):
     pass
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
+@router.post("/")
 async def create_user(create_user_request: CreateUserRequest):
     user = User(
         username=create_user_request.username,
@@ -84,14 +85,23 @@ async def create_user(create_user_request: CreateUserRequest):
         last_name=create_user_request.last_name,
         hashed_password=bcrypt_context.hash(create_user_request.password),
     )
-    db.add(user)
-    db.commit()
+    db["users"].insert_one(user.model_dump(by_alias=True))
 
 
-@router.post("/token", response_model = Token)
-async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm,Depends()],):
-    user = authenticate_user(form_data.username, form_data.password)
+
+@router.post("/token", response_model=Token)
+async def login_for_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    user = await authenticate_user(form_data.username, form_data.password)
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Incorrect username or password")
-    token = create_access_token(user.username, user.id, timedelta(minutes=60))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password"
+        )
+
+    token = create_access_token(
+        user["username"],
+        str(user["_id"]),  # ObjectId string'e çevrildi
+        timedelta(minutes=60)
+    )
+
     return {"access_token": token, "token_type": "bearer"}
