@@ -63,35 +63,62 @@ async def get_question(id: str, user: Annotated[dict, Depends(get_current_user)]
 
 
 @router.post("/create_question", status_code=status.HTTP_201_CREATED)
-async def create_topic(question: QuestionRequest, user: Annotated[dict, Depends(get_current_user)]):
+async def create_question(question: QuestionRequest, user: Annotated[dict, Depends(get_current_user)]):
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
     topic = await db["topics"].find_one({"_id": ObjectId(question.topic_id)})
     if topic:
         topic["_id"] = str(topic["_id"])
+        topic["user_id"] = str(topic["user_id"])
 
     created_question = Question(text=question.text,result=question.result, topic_id=topic["_id"])
     db["questions"].insert_one(created_question.model_dump(by_alias=True))
 
+from fastapi import Body
+
+@router.put("/update/{id}", status_code=status.HTTP_200_OK)
+async def update_question(
+    id: str,
+    updated_data: QuestionRequest ,
+    user: Annotated[dict, Depends(get_current_user)]
+):
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
+
+    try:
+        question_id = ObjectId(id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
+
+    question = await db["questions"].find_one({"_id": question_id})
+    if question is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Question not found")
+
+    update_data = {
+        "text": updated_data.text,
+        "result": updated_data.result,
+        "topic_id": ObjectId(updated_data.topic_id),
+    }
+
+    await db["questions"].update_one({"_id": question_id}, {"$set": update_data})
+
+    return {"message": "Question updated successfully"}
 
 
+@router.delete("/{id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_question(id: str, user: Annotated[dict, Depends(get_current_user)]):
+    if user is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED)
 
-def markdown_to_text(markdown_string):
-    html = markdown.markdown(markdown_string)
-    soup = BeautifulSoup(html, "html.parser")
-    text = soup.get_text()
-    return text
+    try:
+        question_id = ObjectId(id)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid ID format")
 
+    delete_result = await db["questions"].delete_one({"_id": question_id})
 
-def create_question_with_gemini(topic: str):
-    load_dotenv()
-    genai.configure(api_key=os.environ.get('GOOGLE_API_KEY'))
-    llm = ChatGoogleGenerativeAI(model="gemini")
-    response = llm.invoke(
-        [
-            HumanMessage(content="I will provide you a topic. What i want you to do is to create a question of that topic, my next message will be my topic:"),
-            HumanMessage(content=topic),
-        ]
-    )
-    return markdown_to_text(response.content)
+    if delete_result.deleted_count == 1:
+        return
+    else:
+        raise HTTPException(status_code=404, detail="Question not found")

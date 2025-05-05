@@ -61,3 +61,4 @@ async def create_topic(topic: TopicRequest, user: Annotated[dict, Depends(get_cu
     user_id = user.get("id")
     created_topic = Topic(title=topic.title, user_id=user_id)
     db["topics"].insert_one(created_topic.model_dump(by_alias=True))
+    return created_topic
