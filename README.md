@@ -1,4 +1,5 @@
 **Dosyanın my-chatbot.py dosyası streamlit run my-chatbot.py komutu ile çalıştırılmaktadır.
+
 Bu proje sınavlara hazırlık döneminde kullanılabilen bir web uygulamasıdır.Uygulama mantığı çalışmak istediğiniz pdf dosyasını yüklemeniz ve 
 chatbottan pdf'te yer alan konuları ve bu konularla ilgili soruları almanızdır.Ek olarak bir de soru defteri bulunmaktadır ve bu soru defterine 
 chatbottan alınan sorular eklenebilmektedir.Bu eklenen sorular ile sonrasında quiz oluşturulabilmektedir.
