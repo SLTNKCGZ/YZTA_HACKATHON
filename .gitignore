@@ -1,2 +1,7 @@
 .env
 __pycache__
+users
+chat_histories
+pdf_metadata
+pdf_storage
+question_banks
